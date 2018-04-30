@@ -50,8 +50,6 @@ def fetch_calibs(ima_file, ftpdir='https://hst-crds.stsci.edu/unchecked_get/refe
         
     im = pyfits.open(ima_file)
     for ctype in ['BPIXTAB', 'CCDTAB', 'OSCNTAB', 'CRREJTAB', 'DARKFILE', 'NLINFILE', 'PFLTFILE', 'IMPHTTAB', 'IDCTAB']:
-        if verbose:
-            print('Calib: %s=%s' %(ctype, im[0].header[ctype]))
 
         if im[0].header[ctype] == 'N/A':
             continue
@@ -60,6 +58,9 @@ def fetch_calibs(ima_file, ftpdir='https://hst-crds.stsci.edu/unchecked_get/refe
         
         iref_file = os.path.join(os.getenv('iref'), cimg)
         if not os.path.exists(iref_file):
+            if verbose:
+                print('Calib: %s=%s' %(ctype, im[0].header[ctype]))
+
             os.system('curl -o %s %s/%s' %(iref_file, ftpdir, cimg))
     
     return True
