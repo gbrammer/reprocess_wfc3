@@ -120,8 +120,30 @@ def split_multiaccum(ima, scale_flat=True, get_err=False):
     else:
         return cube, dq, time, NSAMP
         
-         
-def make_IMA_FLT(raw='ibhj31grq_raw.fits', pop_reads=[], remove_ima=True, fix_saturated=True, flatten_ramp=True, stats_region=[[300,714], [300,714]]):
+def compute_earthshine(cube, dq, time, sl_left=slice(40,240), sl_right=slice(760,960)):
+    """
+    Check for scattered earthshine light as the difference between median 
+    values of the left and right column-averages of an image.
+    
+    `cube`, `dq` and `time` come from `split_multiaccum`, run on an IMA file.
+    """
+    from numpy import ma
+            
+    diff = ma.masked_array(np.diff(cube, axis=0), mask=(dq[1:,:,:] > 0))
+    
+    column_average = ma.median(diff, axis=1)
+    left = ma.median(column_average[:, sl_left], axis=1)/np.diff(time)
+    right = ma.median(column_average[:, sl_right], axis=1)/np.diff(time)
+    
+    return left-right
+    
+def silent_log(input_string):
+    """
+    Quiet calwf3 logs
+    """
+    pass
+             
+def make_IMA_FLT(raw='ibhj31grq_raw.fits', pop_reads=[], remove_ima=True, fix_saturated=True, flatten_ramp=True, stats_region=[[300,714], [300,714]], earthshine_threshold=0.1, log_func=silent_log):
     """
     Run calwf3, if necessary, to generate ima & flt files.  Then put the last
     read of the ima in the FLT SCI extension and let Multidrizzle flag 
@@ -154,7 +176,7 @@ def make_IMA_FLT(raw='ibhj31grq_raw.fits', pop_reads=[], remove_ima=True, fix_sa
         raw_im.flush()
     
     #### Run calwf3
-    wfc3tools.calwf3(raw)
+    wfc3tools.calwf3(raw, log_func=log_func)
     
     flt = pyfits.open(raw.replace('raw', 'flt'), mode='update')
     ima = pyfits.open(raw.replace('raw', 'ima'))
@@ -163,6 +185,37 @@ def make_IMA_FLT(raw='ibhj31grq_raw.fits', pop_reads=[], remove_ima=True, fix_sa
     #### of first reads first
     cube, dq, time, NSAMP = split_multiaccum(ima, scale_flat=False)
     
+    if earthshine_threshold > 0:
+        earth_diff = compute_earthshine(cube, dq, time)
+        flag_earth = earth_diff > earthshine_threshold
+        
+        if True:
+            flagged_reads = list(np.where(flag_earth)[0])
+            print('Flagged reads: ', flagged_reads)
+            
+        ### If all but two or few flagged, make a mask
+        NR = len(flag_earth)
+        if flag_earth.sum() >= (NR-2):
+            print('{0} - All reads affected by scattered earthshine!'.format(raw))
+            
+            mask_reg = """# Region file format: DS9 version 4.1
+global color=green dashlist=8 3 width=1 font="helvetica 10 normal roman" select=1 highlite=1 dash=0 fixed=0 edit=1 move=1 delete=1 include=1 source=1
+image
+polygon(-46.89536,1045.4771,391.04896,1040.5005,580.16128,-12.05888,-51.692518,-9.3910781)"""
+            fp = open(raw.replace('_raw.fits','.01.mask.reg'), 'w')
+            fp.write(mask_reg)
+            fp.close()
+        
+        elif (flag_earth.sum() > 0) & (flag_earth.sum() < (NR-2)):
+
+            flagged_reads = list(np.where(flag_earth)[0])
+            print('{0} - earthshine: {1}'.format(raw, flagged_reads))
+            
+            pop_reads = list(pop_reads + flagged_reads)
+            
+        else:
+            pass
+            
     #### Readnoise in 4 amps
     readnoise_2D = np.zeros((1024,1024))
     readnoise_2D[512: ,0:512] += ima[0].header['READNSEA']
@@ -334,7 +387,7 @@ def make_IMA_FLT(raw='ibhj31grq_raw.fits', pop_reads=[], remove_ima=True, fix_sa
                 os.remove(file)
         
             #### Run calwf3 on cleaned IMA
-            wfc3tools.calwf3(raw.replace('raw', 'ima'))
+            wfc3tools.calwf3(raw.replace('raw', 'ima'), log_func=log_func)
             
             #### Put results into an FLT-like file
             ima = pyfits.open(raw.replace('raw', 'ima_ima'))
