@@ -136,7 +136,7 @@ def auto_flag_trails(cube, dq, time, is_grism=False, root='satellite'):
         fpr.writelines(reg)
         fpr.close()
         
-def trails_in_cube(cube, dq, time, line_params=LINE_PARAM_IMAGING, subtract_column=True):
+def trails_in_cube(cube, dq, time, line_params=LINE_PARAM_IMAGING_LONG, subtract_column=True):
     """
     Find satellite trails in MultiAccum sequence
     
