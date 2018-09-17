@@ -17,6 +17,9 @@ try:
 except:
     import pyfits
 
+from . import anomalies
+
+#### Logging
 import logging
 logger = logging.getLogger('reprocess_wfc3')
 logger.setLevel(logging.DEBUG)
@@ -28,6 +31,12 @@ ch.setFormatter(formatter)
 if len(logger.handlers) == 0:
     logger.addHandler(ch)
 
+def silent_log(input_string):
+    """
+    Quiet calwf3 logs
+    """
+    pass
+    
 def get_flat(hdulist):
     """
     Get the flat-field file specified in the header
@@ -119,31 +128,8 @@ def split_multiaccum(ima, scale_flat=True, get_err=False):
         return cube, cube_err, dq, time, NSAMP
     else:
         return cube, dq, time, NSAMP
-        
-def compute_earthshine(cube, dq, time, sl_left=slice(40,240), sl_right=slice(760,960)):
-    """
-    Check for scattered earthshine light as the difference between median 
-    values of the left and right column-averages of an image.
-    
-    `cube`, `dq` and `time` come from `split_multiaccum`, run on an IMA file.
-    """
-    from numpy import ma
-            
-    diff = ma.masked_array(np.diff(cube, axis=0), mask=(dq[1:,:,:] > 0))
-    
-    column_average = ma.median(diff, axis=1)
-    left = ma.median(column_average[:, sl_left], axis=1)/np.diff(time)
-    right = ma.median(column_average[:, sl_right], axis=1)/np.diff(time)
-    
-    return left-right
-    
-def silent_log(input_string):
-    """
-    Quiet calwf3 logs
-    """
-    pass
              
-def make_IMA_FLT(raw='ibhj31grq_raw.fits', pop_reads=[], remove_ima=True, fix_saturated=True, flatten_ramp=True, stats_region=[[300,714], [300,714]], earthshine_threshold=0.1, log_func=silent_log):
+def make_IMA_FLT(raw='ibhj31grq_raw.fits', pop_reads=[], remove_ima=True, fix_saturated=True, flatten_ramp=True, stats_region=[[300,714], [300,714]], earthshine_threshold=0.1, log_func=silent_log, auto_trails=True):
     """
     Run calwf3, if necessary, to generate ima & flt files.  Then put the last
     read of the ima in the FLT SCI extension and let Multidrizzle flag 
@@ -176,6 +162,7 @@ def make_IMA_FLT(raw='ibhj31grq_raw.fits', pop_reads=[], remove_ima=True, fix_sa
         raw_im.flush()
     
     #### Run calwf3
+    print('reprocess_wfc3: calwf3(\'{0}\')'.format(raw))
     wfc3tools.calwf3(raw, log_func=log_func)
     
     flt = pyfits.open(raw.replace('raw', 'flt'), mode='update')
@@ -186,17 +173,18 @@ def make_IMA_FLT(raw='ibhj31grq_raw.fits', pop_reads=[], remove_ima=True, fix_sa
     cube, dq, time, NSAMP = split_multiaccum(ima, scale_flat=False)
     
     if earthshine_threshold > 0:
-        earth_diff = compute_earthshine(cube, dq, time)
+        earth_diff = anomalies.compute_earthshine(cube, dq, time)
         flag_earth = earth_diff > earthshine_threshold
         
-        if True:
-            flagged_reads = list(np.where(flag_earth)[0])
-            print('Flagged reads: ', flagged_reads)
+        # if True:
+        #     flagged_reads = list(np.where(flag_earth)[0])
+        #     #print('Flagged reads: ', flagged_reads)
             
         ### If all but two or few flagged, make a mask
         NR = len(flag_earth)
-        if flag_earth.sum() >= (NR-2):
-            print('{0} - All reads affected by scattered earthshine!'.format(raw))
+        if (~flag_earth).sum() <= 2:
+            flagged_reads = list(np.where(flag_earth)[0])
+            print('reprocess_wfc3: {0} - {1}/{2} reads affected by scattered earthshine: {3} **make mask**'.format(raw, flag_earth.sum(), NR, flagged_reads))
             
             mask_reg = """# Region file format: DS9 version 4.1
 global color=green dashlist=8 3 width=1 font="helvetica 10 normal roman" select=1 highlite=1 dash=0 fixed=0 edit=1 move=1 delete=1 include=1 source=1
@@ -206,16 +194,22 @@ polygon(-46.89536,1045.4771,391.04896,1040.5005,580.16128,-12.05888,-51.692518,-
             fp.write(mask_reg)
             fp.close()
         
-        elif (flag_earth.sum() > 0) & (flag_earth.sum() < (NR-2)):
+        elif (flag_earth.sum() > 0) & ((~flag_earth).sum() > 2):
 
             flagged_reads = list(np.where(flag_earth)[0])
-            print('{0} - earthshine: {1}'.format(raw, flagged_reads))
+            print('reprocess_wfc3: {0} - {1}/{2} reads affected by scattered earthshine: {3}'.format(raw, flag_earth.sum(), NR, flagged_reads))
             
-            pop_reads = list(pop_reads + flagged_reads)
+            pop_reads = pop_reads + flagged_reads
             
         else:
             pass
-            
+    
+    if (flag_earth.sum() == 0) & auto_trails:
+        is_grism = ima[0].header['FILTER'] in ['G102','G141']
+        root = os.path.basename(ima.filename()).split('_')[0]        
+        anomalies.auto_flag_trails(cube, dq, time, is_grism=is_grism,
+                                   root=root)
+                
     #### Readnoise in 4 amps
     readnoise_2D = np.zeros((1024,1024))
     readnoise_2D[512: ,0:512] += ima[0].header['READNSEA']
@@ -234,7 +228,7 @@ polygon(-46.89536,1045.4771,391.04896,1040.5005,580.16128,-12.05888,-51.692518,-
     ### Pop out reads affected by satellite trails or earthshine
     masks = glob.glob(raw.replace('.fits', '*mask.reg'))
     if (len(pop_reads) > 0) | (len(masks) > 0):
-        print('\n****\nPop reads %s from %s\n****\n' %(pop_reads, ima.filename()))
+        print('reprocess_wfc3: Pop reads {0} from {1}'.format(pop_reads, ima.filename()))
         
         #### Need to put dark back in for Poisson
         dark_file = ima[0].header['DARKFILE'].replace('iref$', os.getenv('iref')+'/')
@@ -289,7 +283,7 @@ polygon(-46.89536,1045.4771,391.04896,1040.5005,580.16128,-12.05888,-51.692518,-
             wht_ma.mask[0,:] = True
             
             avg = (drate_ma*wht_ma).sum(axis=0)/wht_ma.sum(axis=0)
-            pyfits.writeto('%s_avg.fits' %(raw.split('_raw')[0]), data=avg.data.reshape(sh)[5:-5,5:-5], clobber=True)
+            pyfits.writeto('%s_avg.fits' %(raw.split('_raw')[0]), data=avg.data.reshape(sh)[5:-5,5:-5], overwrite=True)
                 
         #### Removed masked regions of individual reads
         if len(masks) > 0:
@@ -420,7 +414,6 @@ polygon(-46.89536,1045.4771,391.04896,1040.5005,580.16128,-12.05888,-51.692518,-
     #### Background will be different under saturated pixels but maybe won't
     #### matter so much for such bright objects.
     if (fix_saturated):
-        print('Fix Saturated pixels:')
         #### Saturated pixels
         zi, yi, xi = np.indices(dq.shape)
         saturated = (dq & 256) > 0
@@ -430,7 +423,7 @@ polygon(-46.89536,1045.4771,391.04896,1040.5005,580.16128,-12.05888,-51.692518,-
         ### 2D array of the last un-saturated read
         last_ok_read = np.max(zi_flag, axis=0)
         sat_zero = last_ok_read == 0        
-        pyfits.writeto(raw.replace('_raw','_lastread'), data=last_ok_read[5:-5,5:-5], header=flt[1].header, clobber=True)
+        pyfits.writeto(raw.replace('_raw','_lastread'), data=last_ok_read[5:-5,5:-5], header=flt[1].header, overwrite=True)
         ### keep pixels from first read even if saturated
         last_ok_read[sat_zero] = 1
         
@@ -452,7 +445,7 @@ polygon(-46.89536,1045.4771,391.04896,1040.5005,580.16128,-12.05888,-51.692518,-
         final_dq[fixed_sat] -= 256
         final_dq[sat_zero] |= 256
         
-        print('  Nsat = %d' %(fixed_sat.sum()))
+        print('reprocess_wfc3: Fix {0} saturated pixels'.format(fixed_sat.sum()))
         flt['DQ'].data |= final_dq[5:-5,5:-5] & 256
         
     else:
@@ -465,7 +458,7 @@ polygon(-46.89536,1045.4771,391.04896,1040.5005,580.16128,-12.05888,-51.692518,-
     #### Some earthshine flares DQ masked as 32: "unstable pixels"
     mask = (flt['DQ'].data & 32) > 0
     if mask.sum() > 1.e4:
-        print('\n****\nTake out excessive DQ=32 flags (N=%e)\n****\n' %(mask.sum()))
+        print('reprocess_wfc3: Take out excessive DQ=32 flags (N={0:.2e})'.format(mask.sum()))
         #flt['DQ'].data[mask] -= 32
         mask = flt['DQ'].data & 32
         ### Leave flagged 32 pixels around the edges
@@ -649,7 +642,7 @@ def show_MultiAccum_reads(raw='ibp329isq_raw.fits', flatten_ramp=False, verbose=
             os.remove(file)
             
         imraw[0].header['CRCORR'] = 'PERFORM'
-        imraw.writeto(raw.replace('q_raw', 'x_raw'), clobber=True)
+        imraw.writeto(raw.replace('q_raw', 'x_raw'), overwrite=True)
         
         ## Run calwf3
         wfc3tools.calwf3(raw.replace('q_raw', 'x_raw'))
