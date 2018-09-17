@@ -84,7 +84,7 @@ def test():
 # Imaging
 LINE_PARAM_IMAGING_LONG = {'sn_thresh': 4, 'line_length': 700, 'line_thresh': 2, 'lo': 5, 'med_size': 5, 'use_canny': True, 'hi': 10, 'NK': 3, 'line_gap': 7}
 
-LINE_PARAM_IMAGING_SHORT = {'sn_thresh': 4, 'line_length': 100, 'line_thresh': 2, 'lo': 5, 'med_size': 5, 'use_canny': True, 'hi': 10, 'NK': 3, 'line_gap': 2}
+LINE_PARAM_IMAGING_SHORT = {'sn_thresh': 4, 'line_length': 250, 'line_thresh': 2, 'lo': 5, 'med_size': 5, 'use_canny': True, 'hi': 10, 'NK': 3, 'line_gap': 2}
 
 
 # # Grism
@@ -94,7 +94,7 @@ LINE_PARAM_IMAGING_SHORT = {'sn_thresh': 4, 'line_length': 100, 'line_thresh': 2
 
 LINE_PARAM_GRISM_LONG = {'sn_thresh': 2, 'line_length': 600, 'line_thresh': 2, 'use_canny': True, 'med_size': 5, 'lo': 3, 'hi': 7, 'NK': 30, 'line_gap': 3}
 
-LINE_PARAM_GRISM_SHORT = {'sn_thresh': 2, 'line_length': 150, 'line_thresh': 2, 'use_canny': True, 'med_size': 5, 'lo': 3, 'hi': 7, 'NK': 30, 'line_gap': 1}
+LINE_PARAM_GRISM_SHORT = {'sn_thresh': 2, 'line_length': 250, 'line_thresh': 2, 'use_canny': True, 'med_size': 5, 'lo': 3, 'hi': 7, 'NK': 30, 'line_gap': 1}
 
 def auto_flag_trails(cube, dq, time, is_grism=False, root='satellite'):
     """
