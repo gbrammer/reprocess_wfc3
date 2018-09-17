@@ -173,7 +173,7 @@ def trails_in_cube(cube, dq, time, line_params=LINE_PARAM_IMAGING_LONG, subtract
     from . import utils
     
     ## Line parameters
-    lp = LINE_PARAM_IMAGING
+    lp = LINE_PARAM_IMAGING_LONG
     for k in line_params:
         lp[k] = line_params[k]
     
