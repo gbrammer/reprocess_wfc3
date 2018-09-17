@@ -10,8 +10,6 @@ import shutil
 import numpy as np
 import numpy.ma
 
-import matplotlib.pyplot as plt
-
 try:
     import astropy.io.fits as pyfits
 except:
@@ -531,6 +529,9 @@ def show_MultiAccum_reads(raw='ibp329isq_raw.fits', flatten_ramp=False, verbose=
     IMA or RAW file.
     """    
     import scipy.ndimage as nd
+
+    import matplotlib.pyplot as plt
+    
     from matplotlib.figure import Figure
     from matplotlib.backends.backend_agg import FigureCanvasAgg
     
