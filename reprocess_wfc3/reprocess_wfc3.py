@@ -160,7 +160,7 @@ def make_IMA_FLT(raw='ibhj31grq_raw.fits', pop_reads=[], remove_ima=True, fix_sa
         raw_im.flush()
     
     #### Run calwf3
-    print('reprocess_wfc3: calwf3(\'{0}\')'.format(raw))
+    print('reprocess_wfc3: wfc3tools.calwf3(\'{0}\')'.format(raw))
     wfc3tools.calwf3(raw, log_func=log_func)
     
     flt = pyfits.open(raw.replace('raw', 'flt'), mode='update')
@@ -173,7 +173,13 @@ def make_IMA_FLT(raw='ibhj31grq_raw.fits', pop_reads=[], remove_ima=True, fix_sa
     if earthshine_threshold > 0:
         earth_diff = anomalies.compute_earthshine(cube, dq, time)
         flag_earth = earth_diff > earthshine_threshold
+
+        flagged_reads = list(np.where(flag_earth)[0])
         
+        # Just zeroth read
+        if flagged_reads == [0]:
+            flag_earth[0] = False
+            
         # if True:
         #     flagged_reads = list(np.where(flag_earth)[0])
         #     #print('Flagged reads: ', flagged_reads)
@@ -181,7 +187,6 @@ def make_IMA_FLT(raw='ibhj31grq_raw.fits', pop_reads=[], remove_ima=True, fix_sa
         ### If all but two or few flagged, make a mask
         NR = len(flag_earth)
         if (~flag_earth).sum() <= 2:
-            flagged_reads = list(np.where(flag_earth)[0])
             print('reprocess_wfc3: {0} - {1}/{2} reads affected by scattered earthshine: {3} **make mask**'.format(raw, flag_earth.sum(), NR, flagged_reads))
             
             mask_reg = """# Region file format: DS9 version 4.1
@@ -194,7 +199,6 @@ polygon(-46.89536,1045.4771,391.04896,1040.5005,580.16128,-12.05888,-51.692518,-
         
         elif (flag_earth.sum() > 0) & ((~flag_earth).sum() > 2):
 
-            flagged_reads = list(np.where(flag_earth)[0])
             print('reprocess_wfc3: {0} - {1}/{2} reads affected by scattered earthshine: {3}'.format(raw, flag_earth.sum(), NR, flagged_reads))
             
             pop_reads = pop_reads + flagged_reads
@@ -318,7 +322,7 @@ polygon(-46.89536,1045.4771,391.04896,1040.5005,580.16128,-12.05888,-51.692518,-
             #### Subtract out the median of each read to make background flat
             fix_saturated = False
             
-            print('\n*** Flatten ramp ***')
+            print('reprocess_wfc3: Flatten ramp {0}'.format(raw))
             ima = pyfits.open(raw.replace('raw', 'ima'), mode='update')
             
             #### Grism exposures aren't flat-corrected
@@ -338,7 +342,7 @@ polygon(-46.89536,1045.4771,391.04896,1040.5005,580.16128,-12.05888,-51.692518,-
             for i in range(ima[0].header['NSAMP']-2):
                 ima['SCI',i+1].data /= flat
                 med = np.median(ima['SCI',i+1].data[sly, slx])
-                print('Read #%d, background:%.2f' %(i+1, med))
+                print('reprocess_wfc3:   read {0:>2d}, bg= {1:.2f}'.format(i+1, med))
                 ima['SCI',i+1].data += total_countrate - med
             
             if 'G1' in filter:
@@ -375,7 +379,7 @@ polygon(-46.89536,1045.4771,391.04896,1040.5005,580.16128,-12.05888,-51.692518,-
             #### Initial cleanup
             files=glob.glob(raw.replace('raw', 'ima_*'))
             for file in files:
-                print('#cleanup: rm %s' %(file))
+                print('reprocess_wfc3: cleanup - rm {0}'.format(file))
                 os.remove(file)
         
             #### Run calwf3 on cleaned IMA
@@ -399,7 +403,7 @@ polygon(-46.89536,1045.4771,391.04896,1040.5005,580.16128,-12.05888,-51.692518,-
             ### Clean up
             files=glob.glob(raw.replace('raw', 'ima_*'))
             for file in files:
-                print('#cleanup: rm %s' %(file))
+                print('reprocess_wfc3: cleanup - rm {0}'.format(file))
                 os.remove(file)
                 
         else:

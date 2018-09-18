@@ -69,10 +69,10 @@ def test():
         root = ima.filename().split('_')[0]
         print(root, len(lines))
 
-        fig = sat_trail_figure(image, edges, lines, label=root)
-        fig.savefig('{0}_trails.png'.format(root))
-
         if len(lines) > 0:
+            fig = sat_trail_figure(image, edges, lines, label=root)
+            fig.savefig('{0}_trails.png'.format(root))
+
             reg = anomalies.segments_to_mask(lines, params[0]['NK'],
                                              image.shape[1],
                                              buf=params[0]['NK']*(1+is_grism))
