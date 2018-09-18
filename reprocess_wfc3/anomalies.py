@@ -231,10 +231,10 @@ def trails_in_cube(cube, dq, time, line_params=LINE_PARAM_IMAGING_LONG, subtract
     mask = mk != 0
     
     if line_length < 240:
-        print('xxx mask center', line_length, mask.sum())
+        #print('xxx mask center', line_length, mask.sum())
         sl = slice(2*line_length//NK,-2*line_length//NK)
         mask[sl,sl] = False
-        print('yyy mask center', line_length, mask.sum())
+        #print('yyy mask center', line_length, mask.sum())
         
     # Column average
     if subtract_column:
