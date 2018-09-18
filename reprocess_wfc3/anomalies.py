@@ -84,7 +84,7 @@ def test():
 # Imaging
 LINE_PARAM_IMAGING_LONG = {'sn_thresh': 4, 'line_length': 700, 'line_thresh': 2, 'lo': 5, 'med_size': 5, 'use_canny': True, 'hi': 10, 'NK': 3, 'line_gap': 7}
 
-LINE_PARAM_IMAGING_SHORT = {'sn_thresh': 4, 'line_length': 250, 'line_thresh': 2, 'lo': 5, 'med_size': 5, 'use_canny': True, 'hi': 10, 'NK': 3, 'line_gap': 2}
+LINE_PARAM_IMAGING_SHORT = {'sn_thresh': 4, 'line_length': 100, 'line_thresh': 2, 'lo': 5, 'med_size': 5, 'use_canny': True, 'hi': 10, 'NK': 3, 'line_gap': 1}
 
 
 # # Grism
@@ -230,6 +230,12 @@ def trails_in_cube(cube, dq, time, line_params=LINE_PARAM_IMAGING_LONG, subtract
     
     mask = mk != 0
     
+    if line_length < 240:
+        print('xxx mask center', line_length, mask.sum())
+        sl = slice(2*line_length//NK,-2*line_length//NK)
+        mask[sl,sl] = False
+        print('yyy mask center', line_length, mask.sum())
+        
     # Column average
     if subtract_column:
         col = np.median(mk, axis=0)
