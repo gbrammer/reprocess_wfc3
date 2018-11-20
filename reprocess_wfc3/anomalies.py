@@ -130,7 +130,7 @@ def auto_flag_trails(cube, dq, time, is_grism=False, root='satellite'):
     
     if len(lines) > 0:
         reg = segments_to_mask(lines, params[0]['NK'], image.shape[1],
-                               buf=params[0]['NK']*2)
+                               buf=params[0]['NK']*4)
                                          
         fpr = open('{0}.01.mask.reg'.format(root),'w')
         fpr.writelines(reg)
