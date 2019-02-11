@@ -96,7 +96,7 @@ LINE_PARAM_GRISM_LONG = {'sn_thresh': 2, 'line_length': 600, 'line_thresh': 2, '
 
 LINE_PARAM_GRISM_SHORT = {'sn_thresh': 2, 'line_length': 250, 'line_thresh': 2, 'use_canny': True, 'med_size': 5, 'lo': 3, 'hi': 7, 'NK': 30, 'line_gap': 1}
 
-def auto_flag_trails(cube, dq, time, is_grism=False, root='satellite'):
+def auto_flag_trails(cube, dq, time, is_grism=False, root='satellite', earthshine_mask=False, pop_reads=[]):
     """
     Automatically flag satellite trails
     """
@@ -110,14 +110,18 @@ def auto_flag_trails(cube, dq, time, is_grism=False, root='satellite'):
         
     out = trails_in_cube(cube, dq, time,
                          line_params=params[0],
-                         subtract_column=is_grism)
+                         subtract_column=is_grism,
+                         earthshine_mask=earthshine_mask, 
+                         pop_reads=pop_reads)
 
     image, edges, lines = out
     
     if len(lines) == 0:
         out = trails_in_cube(cube, dq, time,
                              line_params=params[1],
-                             subtract_column=is_grism)
+                             subtract_column=is_grism,
+                             earthshine_mask=earthshine_mask,
+                             pop_reads=pop_reads)
     
         image, edges, lines = out
             
@@ -132,11 +136,11 @@ def auto_flag_trails(cube, dq, time, is_grism=False, root='satellite'):
         reg = segments_to_mask(lines, params[0]['NK'], image.shape[1],
                                buf=params[0]['NK']*4)
                                          
-        fpr = open('{0}.01.mask.reg'.format(root),'w')
+        fpr = open('{0}.01.mask.reg'.format(root),'a')
         fpr.writelines(reg)
         fpr.close()
         
-def trails_in_cube(cube, dq, time, line_params=LINE_PARAM_IMAGING_LONG, subtract_column=True):
+def trails_in_cube(cube, dq, time, line_params=LINE_PARAM_IMAGING_LONG, subtract_column=True, earthshine_mask=False, pop_reads=[]):
     """
     Find satellite trails in MultiAccum sequence
     
@@ -223,18 +227,30 @@ def trails_in_cube(cube, dq, time, line_params=LINE_PARAM_IMAGING_LONG, subtract
     medfilt[:,-16:] = 0
     
     medfilt = (medfilt*dq0)[5:-5,5:-5]
-    
+                
     # Smoothed image
     kern = np.ones((NK, NK))/NK**2
     mk = nd.convolve(medfilt, kern)[NK//2::NK,NK//2::NK][1:-1,1:-1]
     
     mask = mk != 0
     
-    if line_length < 240:
-        #print('xxx mask center', line_length, mask.sum())
-        sl = slice(2*line_length//NK,-2*line_length//NK)
-        mask[sl,sl] = False
-        #print('yyy mask center', line_length, mask.sum())
+    # Apply earthshine mask
+    if earthshine_mask:
+        yp, xp = np.indices((1014,1014))
+        x0, y0 = [578, 398], [0,1014]
+        cline = np.polyfit(x0, y0, 1)
+        yi = np.polyval(cline, xp)
+        emask = yp > yi
+        #medfilt *= emask
+        mask &= emask[NK//2::NK,NK//2::NK][1:-1,1:-1]
+        
+    else:
+        # Mask center to only get trails that extend from one edge to another
+        if line_length < 240:
+            #print('xxx mask center', line_length, mask.sum())
+            sl = slice(2*line_length//NK,-2*line_length//NK)
+            mask[sl,sl] = False
+            #print('yyy mask center', line_length, mask.sum())
         
     # Column average
     if subtract_column:
@@ -242,9 +258,10 @@ def trails_in_cube(cube, dq, time, line_params=LINE_PARAM_IMAGING_LONG, subtract
         mk -= col
     
     image = mk
+    #image *= mask
     
     # Image ~ standard deviation
-    nmad = utils.nmad(image)
+    nmad = utils.nmad(image[mask])
 
     if use_canny:
         edges = canny(image, sigma=1, low_threshold=lo*nmad, high_threshold=hi*nmad, mask=mask)
@@ -322,7 +339,7 @@ def sat_trail_figure(image, edges, lines, label='Exposure'):
     from matplotlib import cm
     from . import utils
     
-    nmad = utils.nmad(image)
+    nmad = utils.nmad(image[image != 0])
     
     # Generating figure 2
     fig, axes = plt.subplots(1, 2, figsize=(4, 2), sharex=True, sharey=True)

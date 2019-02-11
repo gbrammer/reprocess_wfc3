@@ -170,6 +170,8 @@ def make_IMA_FLT(raw='ibhj31grq_raw.fits', pop_reads=[], remove_ima=True, fix_sa
     #### of first reads first
     cube, dq, time, NSAMP = split_multiaccum(ima, scale_flat=False)
     
+    earthshine_mask = False
+    
     if earthshine_threshold > 0:
         earth_diff = anomalies.compute_earthshine(cube, dq, time)
         flag_earth = earth_diff > earthshine_threshold
@@ -196,21 +198,30 @@ polygon(-46.89536,1045.4771,391.04896,1040.5005,580.16128,-12.05888,-51.692518,-
             fp = open(raw.replace('_raw.fits','.01.mask.reg'), 'w')
             fp.write(mask_reg)
             fp.close()
-        
+            
+            earthshine_mask = True
+            
         elif (flag_earth.sum() > 0) & ((~flag_earth).sum() > 2):
 
             print('reprocess_wfc3: {0} - {1}/{2} reads affected by scattered earthshine: {3}'.format(raw, flag_earth.sum(), NR, flagged_reads))
             
             pop_reads = pop_reads + flagged_reads
             
+            earthshine_mask = True
+            
         else:
             pass
     
-    if (flag_earth.sum() == 0) & auto_trails:
+    if auto_trails:
+        if earthshine_mask:
+            # Recompute cube
+            print('Recompute cube')
+            cube, dq, time, NSAMP = split_multiaccum(ima, scale_flat=False)
+            
         is_grism = ima[0].header['FILTER'] in ['G102','G141']
         root = os.path.basename(ima.filename()).split('_')[0]        
         anomalies.auto_flag_trails(cube, dq, time, is_grism=is_grism,
-                                   root=root)
+                                   root=root, earthshine_mask=earthshine_mask)
                 
     #### Readnoise in 4 amps
     readnoise_2D = np.zeros((1024,1024))
@@ -229,7 +240,7 @@ polygon(-46.89536,1045.4771,391.04896,1040.5005,580.16128,-12.05888,-51.692518,-
     
     ### Pop out reads affected by satellite trails or earthshine
     masks = glob.glob(raw.replace('.fits', '*mask.reg'))
-    if (len(pop_reads) > 0) | (len(masks) > 0):
+    if (len(pop_reads) > 0): # | (len(masks) > 0):
         print('reprocess_wfc3: Pop reads {0} from {1}'.format(pop_reads, ima.filename()))
         
         #### Need to put dark back in for Poisson
@@ -288,21 +299,21 @@ polygon(-46.89536,1045.4771,391.04896,1040.5005,580.16128,-12.05888,-51.692518,-
             pyfits.writeto('%s_avg.fits' %(raw.split('_raw')[0]), data=avg.data.reshape(sh)[5:-5,5:-5], overwrite=True)
                 
         #### Removed masked regions of individual reads
-        if len(masks) > 0:
-            import pyregion
-            for mask in masks:
-                mask_read = int(mask.split('.')[-3])
-                if mask_read in pop_reads:
-                    continue
-                
-                print('Mask pixels in read %d (%s)' %(mask_read, mask))
-                
-                refhdu = ima['SCI', 1]
-                r = pyregion.open(mask).as_imagecoord(header=refhdu.header)
-                mask_array = r.get_mask(hdu=refhdu)
-                final_exptime -= mask_array*dt[mask_read]
-                final_sci -= diff[mask_read,:,:]*mask_array
-                final_dark -= dark_diff[mask_read,:,:]*mask_array
+        # if len(masks) > 0:
+        #     import pyregion
+        #     for mask in masks:
+        #         mask_read = int(mask.split('.')[-3])
+        #         if mask_read in pop_reads:
+        #             continue
+        #         
+        #         print('Mask pixels in read %d (%s)' %(mask_read, mask))
+        #         
+        #         refhdu = ima['SCI', 1]
+        #         r = pyregion.open(mask).as_imagecoord(header=refhdu.header)
+        #         mask_array = r.get_mask(hdu=refhdu)
+        #         final_exptime -= mask_array*dt[mask_read]
+        #         final_sci -= diff[mask_read,:,:]*mask_array
+        #         final_dark -= dark_diff[mask_read,:,:]*mask_array
                 
         #### Variance terms
         ## read noise
@@ -425,7 +436,7 @@ polygon(-46.89536,1045.4771,391.04896,1040.5005,580.16128,-12.05888,-51.692518,-
         ### 2D array of the last un-saturated read
         last_ok_read = np.max(zi_flag, axis=0)
         sat_zero = last_ok_read == 0        
-        pyfits.writeto(raw.replace('_raw','_lastread'), data=last_ok_read[5:-5,5:-5], header=flt[1].header, overwrite=True)
+        # pyfits.writeto(raw.replace('_raw','_lastread'), data=last_ok_read[5:-5,5:-5], header=flt[1].header, overwrite=True)
         ### keep pixels from first read even if saturated
         last_ok_read[sat_zero] = 1
         
