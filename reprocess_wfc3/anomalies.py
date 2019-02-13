@@ -82,9 +82,9 @@ def test():
             fpr.close()
         
 # Imaging
-LINE_PARAM_IMAGING_LONG = {'sn_thresh': 4, 'line_length': 700, 'line_thresh': 2, 'lo': 5, 'med_size': 5, 'use_canny': True, 'hi': 10, 'NK': 3, 'line_gap': 7}
+LINE_PARAM_IMAGING_LONG = {'sn_thresh': 4, 'line_length': 700, 'line_thresh': 2, 'med_size': [12,1], 'use_canny': True, 'lo': 5, 'hi': 10, 'NK': 3, 'line_gap': 7}
 
-LINE_PARAM_IMAGING_SHORT = {'sn_thresh': 4, 'line_length': 100, 'line_thresh': 2, 'lo': 5, 'med_size': 5, 'use_canny': True, 'hi': 10, 'NK': 3, 'line_gap': 1}
+LINE_PARAM_IMAGING_SHORT = {'sn_thresh': 4, 'line_length': 100, 'line_thresh': 2, 'med_size': [12,1], 'use_canny': True, 'lo': 9, 'hi': 14, 'NK': 3, 'line_gap': 1}
 
 
 # # Grism
@@ -92,9 +92,9 @@ LINE_PARAM_IMAGING_SHORT = {'sn_thresh': 4, 'line_length': 100, 'line_thresh': 2
 # 
 # LINE_PARAM_GRISM_LONG = {'line_length': 600, 'line_thresh': 2, 'NK': 30, 'med_size': 5, 'use_canny': False, 'hi': 7, 'lo': 3, 'line_gap': 1, 'sn_thresh':2}
 
-LINE_PARAM_GRISM_LONG = {'sn_thresh': 2, 'line_length': 600, 'line_thresh': 2, 'use_canny': True, 'med_size': 5, 'lo': 3, 'hi': 7, 'NK': 30, 'line_gap': 3}
+LINE_PARAM_GRISM_LONG = {'sn_thresh': 2, 'line_length': 600, 'line_thresh': 2, 'use_canny': True, 'med_size': [12,1], 'lo': 3, 'hi': 7, 'NK': 30, 'line_gap': 3}
 
-LINE_PARAM_GRISM_SHORT = {'sn_thresh': 2, 'line_length': 250, 'line_thresh': 2, 'use_canny': True, 'med_size': 5, 'lo': 3, 'hi': 7, 'NK': 30, 'line_gap': 1}
+LINE_PARAM_GRISM_SHORT = {'sn_thresh': 2, 'line_length': 250, 'line_thresh': 2, 'use_canny': True, 'med_size': [12,1], 'lo': 10, 'hi': 15, 'NK': 30, 'line_gap': 1}
 
 def auto_flag_trails(cube, dq, time, is_grism=False, root='satellite', earthshine_mask=False, pop_reads=[]):
     """
@@ -108,6 +108,7 @@ def auto_flag_trails(cube, dq, time, is_grism=False, root='satellite', earthshin
     else:
         params = [LINE_PARAM_IMAGING_LONG, LINE_PARAM_IMAGING_SHORT]
         
+    print('Try trail params: {0}'.format(params[0]))
     out = trails_in_cube(cube, dq, time,
                          line_params=params[0],
                          subtract_column=is_grism,
@@ -116,7 +117,10 @@ def auto_flag_trails(cube, dq, time, is_grism=False, root='satellite', earthshin
 
     image, edges, lines = out
     
+    is_short=False
     if len(lines) == 0:
+        is_short=True
+        print('Try trail params: {0}'.format(params[1]))
         out = trails_in_cube(cube, dq, time,
                              line_params=params[1],
                              subtract_column=is_grism,
@@ -124,7 +128,7 @@ def auto_flag_trails(cube, dq, time, is_grism=False, root='satellite', earthshin
                              pop_reads=pop_reads)
     
         image, edges, lines = out
-            
+    
     #root = ima.filename().split('_')[0]
     print('reprocess_wfc3: {0} has {1} satellite trails'.format(root, len(lines)))
     

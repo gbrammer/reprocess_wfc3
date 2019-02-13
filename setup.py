@@ -1,7 +1,10 @@
 from distutils.core import setup
 
+# v0.1
+# v0.2 - change trail detection thresholds
+
 setup(name='reprocess_wfc3',
-      version='0.1',
+      version='0.2',
       description='Reprocessing scripts for WFC3/IR',
       author='Gabriel Brammer',
       author_email='brammer@stsci.edu',
