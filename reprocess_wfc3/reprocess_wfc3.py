@@ -15,7 +15,11 @@ try:
 except:
     import pyfits
 
-from . import anomalies
+#### WFC3 tools (pip, conda)
+import wfc3tools
+
+from . import anomalies, utils
+utils.set_warnings() # silence numpy warnings
 
 #### Logging
 import logging
@@ -137,9 +141,7 @@ def make_IMA_FLT(raw='ibhj31grq_raw.fits', pop_reads=[], remove_ima=True, fix_sa
     parameter `pop_reads` is a `list` containing the reads to remove, where
     a value of 1 corresponds to the first real read after the 2.9s flush.
     
-    Requires IRAFX for wfc3tools
     """
-    import wfc3tools
         
     #### Remove existing products or calwf3 will die
     for ext in ['flt','ima']:
@@ -215,14 +217,14 @@ polygon(-46.89536,1045.4771,391.04896,1040.5005,580.16128,-12.05888,-51.692518,-
     if auto_trails:
         if earthshine_mask:
             # Recompute cube
-            print('Recompute cube')
+            print('reprocess_wfc3: {0} Recompute cube'.format(raw))
             cube, dq, time, NSAMP = split_multiaccum(ima, scale_flat=False)
             
         is_grism = ima[0].header['FILTER'] in ['G102','G141']
         root = os.path.basename(ima.filename()).split('_')[0]        
         anomalies.auto_flag_trails(cube, dq, time, is_grism=is_grism,
                                    root=root, earthshine_mask=earthshine_mask)
-                
+                    
     #### Readnoise in 4 amps
     readnoise_2D = np.zeros((1024,1024))
     readnoise_2D[512: ,0:512] += ima[0].header['READNSEA']
@@ -481,8 +483,14 @@ polygon(-46.89536,1045.4771,391.04896,1040.5005,580.16128,-12.05888,-51.692518,-
     flt[0].header['IMA2FLT'] = (1, 'FLT extracted from IMA file')
     flt[0].header['IMASAT'] = (fix_saturated*1, 'Manually fixed saturation')
     flt[0].header['NPOP'] = (len(pop_reads), 'Number of reads popped from the sequence')
-    for iread, read in enumerate(pop_reads):
-        flt[0].header['POPRD%02d' %(iread+1)] = (read, 'Read kicked out of the MULTIACCUM sequence')
+    if len(pop_reads) > 0:
+        pop_str = ' '.join('{0}'.format(r) for r in pop_reads)
+    else:
+        pop_str = None
+    
+    flt[0].header['POPREADS'] = (pop_str, 'Reads popped out of MultiACCUM sequence')
+    # for iread, read in enumerate(pop_reads):
+    #     flt[0].header['POPRD%02d' %(iread+1)] = (read, 'Read kicked out of the MULTIACCUM sequence')
         
     flt.flush()
     
@@ -497,18 +505,26 @@ def reprocess_parallel(files, cpu_count=0, skip=True):
     import multiprocessing as mp
     import time
     
-    t0_pool = time.time()
-    if cpu_count <= 0:
-        cpu_count = mp.cpu_count()
-        
-    pool = mp.Pool(processes=cpu_count)
-    
+    nskip = 0
     if skip:
         for i in range(len(files))[::-1]:
             if os.path.exists(files[i].replace('_raw.fits', '_flt.fits')):
                 p = files.pop(i)
+                nskip += 1
                 
-    results = [pool.apply_async(make_IMA_FLT, (file, [], True, True, True, [[300,700],[300,700]])) for file in files]
+    if len(files) == 0:
+        return True
+                        
+    t0_pool = time.time()
+    if cpu_count <= 0:
+        cpu_count = np.minimum(mp.cpu_count(), len(files))
+    
+    msg = 'reprocess_wfc3: Running `make_IMA_FLT` for {0} files on {1} CPUs ({2} skipped)'
+    print(msg.format(len(files), cpu_count, nskip))
+      
+    pool = mp.Pool(processes=cpu_count)
+    
+    results = [pool.apply_async(make_IMA_FLT, (file, [], True, True, True, [[300,700],[300,700]], 0.1, silent_log, True)) for file in files]
     pool.close()
     pool.join()
     
@@ -521,16 +537,24 @@ def show_ramps_parallel(files, cpu_count=0, skip=True):
     import multiprocessing as mp
     import time
     
-    t0_pool = time.time()
-    if cpu_count <= 0:
-        cpu_count = mp.cpu_count()
-        
-    pool = mp.Pool(processes=cpu_count)
-    
+    nskip = 0
     if skip:
         for i in range(len(files))[::-1]:
             if os.path.exists(files[i].replace('_raw.fits', '_ramp.png')):
                 p = files.pop(i)
+                nskip += 1
+                
+    if len(files) == 0:
+        return True
+        
+    t0_pool = time.time()
+    if cpu_count <= 0:
+        cpu_count = np.minimum(mp.cpu_count(), len(files))
+    
+    msg = 'reprocess_wfc3: Running `show_MultiAccum_reads` for {0} files on {1} CPUs ({2} skipped)'
+    print(msg.format(len(files), cpu_count, nskip))
+    
+    pool = mp.Pool(processes=cpu_count)
     
     results = [pool.apply_async(show_MultiAccum_reads, (file, False, False, [[300,700],[300,700]])) for file in files]
     pool.close()
@@ -640,7 +664,6 @@ def show_MultiAccum_reads(raw='ibp329isq_raw.fits', flatten_ramp=False, verbose=
     if flatten_ramp:
         #### Flatten the ramp by setting background countrate to the average.  
         #### Output saved to "*x_flt.fits" rather than the usual *q_flt.fits.
-        import wfc3tools
         
         flux = avg_ramp/np.diff(time)
         avg = avg_ramp.sum()/time[-1]

@@ -1,4 +1,23 @@
 import numpy as np
+import warnings
+
+def set_warnings(numpy_level='ignore', astropy_level='ignore'):
+    """
+    Set global numpy and astropy warnings
+    
+    Parameters
+    ----------
+    numpy_level : {'ignore', 'warn', 'raise', 'call', 'print', 'log'}
+        Numpy error level (see `~numpy.seterr`).
+        
+    astropy_level : {'error', 'ignore', 'always', 'default', 'module', 'once'}
+        Astropy error level (see `~warnings.simplefilter`).
+    
+    """
+    from astropy.utils.exceptions import AstropyWarning
+    
+    np.seterr(all=numpy_level)
+    warnings.simplefilter(astropy_level, category=AstropyWarning)
 
 def nmad(data):
     """Normalized NMAD=1.48 * `~.astropy.stats.median_absolute_deviation`

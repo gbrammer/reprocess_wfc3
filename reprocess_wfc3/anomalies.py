@@ -1,4 +1,20 @@
 import numpy as np
+from numpy import ma
+
+import matplotlib.pyplot as plt
+from matplotlib import cm
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_agg import FigureCanvasAgg
+
+from skimage.feature import canny
+from skimage.transform import probabilistic_hough_line
+from skimage import morphology as morph
+
+import scipy.ndimage as nd
+
+from shapely.geometry import LineString
+
+from . import utils
 
 def compute_earthshine(cube, dq, time, sl_left=slice(40,240), sl_right=slice(760,960)):
     """
@@ -7,7 +23,6 @@ def compute_earthshine(cube, dq, time, sl_left=slice(40,240), sl_right=slice(760
     
     `cube`, `dq` and `time` come from `split_multiaccum`, run on an IMA file.
     """
-    from numpy import ma
             
     diff = ma.masked_array(np.diff(cube, axis=0), mask=(dq[1:,:,:] > 0))
     
@@ -71,8 +86,11 @@ def test():
 
         if len(lines) > 0:
             fig = sat_trail_figure(image, edges, lines, label=root)
-            fig.savefig('{0}_trails.png'.format(root))
-
+            #fig.savefig('{0}_trails.png'.format(root))
+            canvas = FigureCanvasAgg(fig)
+            canvas.print_figure(root+'_trails.png', dpi=200,
+                                transparent=False)
+            
             reg = anomalies.segments_to_mask(lines, params[0]['NK'],
                                              image.shape[1],
                                              buf=params[0]['NK']*(1+is_grism))
@@ -100,15 +118,15 @@ def auto_flag_trails(cube, dq, time, is_grism=False, root='satellite', earthshin
     """
     Automatically flag satellite trails
     """
-    import matplotlib.pyplot as plt
     
     #is_grism = ima[0].header['FILTER'] in ['G102','G141']
+    print('reprocess_wfc3.anomalies: {0}, is_grism={1}'.format(root, is_grism))
     if is_grism:
         params = [LINE_PARAM_GRISM_LONG, LINE_PARAM_GRISM_SHORT]
     else:
         params = [LINE_PARAM_IMAGING_LONG, LINE_PARAM_IMAGING_SHORT]
         
-    print('Try trail params: {0}'.format(params[0]))
+    print('reprocess_wfc3.anomalies: {0}, Long trail params\n   {1}'.format(root, params[0]))
     out = trails_in_cube(cube, dq, time,
                          line_params=params[0],
                          subtract_column=is_grism,
@@ -120,7 +138,8 @@ def auto_flag_trails(cube, dq, time, is_grism=False, root='satellite', earthshin
     is_short=False
     if len(lines) == 0:
         is_short=True
-        print('Try trail params: {0}'.format(params[1]))
+        print('reprocess_wfc3.anomalies: {0}, Short trail params\n   {1}'.format(root, params[1]))
+        #print('Try trail params: {0}'.format(params[1]))
         out = trails_in_cube(cube, dq, time,
                              line_params=params[1],
                              subtract_column=is_grism,
@@ -133,8 +152,12 @@ def auto_flag_trails(cube, dq, time, is_grism=False, root='satellite', earthshin
     print('reprocess_wfc3: {0} has {1} satellite trails'.format(root, len(lines)))
     
     fig = sat_trail_figure(image, edges, lines, label=root)
-    fig.savefig('{0}_trails.png'.format(root))
-    plt.close(fig)
+    canvas = FigureCanvasAgg(fig)
+    canvas.print_figure(root+'_trails.png', dpi=200,
+                        transparent=False)
+
+    # fig.savefig('{0}_trails.png'.format(root))
+    # plt.close(fig)
     
     if len(lines) > 0:
         reg = segments_to_mask(lines, params[0]['NK'], image.shape[1],
@@ -170,15 +193,10 @@ def trails_in_cube(cube, dq, time, line_params=LINE_PARAM_IMAGING_LONG, subtract
         `N` linear segments found on the edge image with
         `skimage.transform.probabilistic_hough_line`.
     
-    """
-    from skimage.feature import canny
-    from skimage.transform import probabilistic_hough_line
-    from skimage import morphology as morph
-    
-    import scipy.ndimage as nd
-    
+    """    
     from .reprocess_wfc3 import split_multiaccum
-    from . import utils
+    
+    utils.set_warnings()
     
     ## Line parameters
     lp = LINE_PARAM_IMAGING_LONG
@@ -290,8 +308,6 @@ def trails_in_cube(cube, dq, time, line_params=LINE_PARAM_IMAGING_LONG, subtract
 def segments_to_mask(lines, NK, NX, buf=None):
     """
     """
-    from shapely.geometry import LineString
-    from . import utils
     
     xl = np.array([-int(0.1*NX), int(1.1*NX)])
     if buf is None:
@@ -339,9 +355,7 @@ def sat_trail_figure(image, edges, lines, label='Exposure'):
         Figure object.
         
     """
-    import matplotlib.pyplot as plt
-    from matplotlib import cm
-    from . import utils
+    utils.set_warnings()
     
     nmad = utils.nmad(image[image != 0])
     
@@ -349,6 +363,9 @@ def sat_trail_figure(image, edges, lines, label='Exposure'):
     fig, axes = plt.subplots(1, 2, figsize=(4, 2), sharex=True, sharey=True)
     ax = axes.ravel()
 
+    # fig = Figure(figsize=(4,2))
+    # ax = [fig.add_subplot(121+i) for i in range(2)]
+        
     ax[0].imshow(image, cmap=cm.gray, origin='lower', 
                  vmin=-1*nmad, vmax=5*nmad)
                  
@@ -375,6 +392,6 @@ def sat_trail_figure(image, edges, lines, label='Exposure'):
         a.set_yticklabels([])
         #a.set_axis_off()
 
-    plt.tight_layout(pad=0.1)
+    fig.tight_layout(pad=0.1)
     return fig
     
