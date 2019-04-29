@@ -231,8 +231,10 @@ def trails_in_cube(cube, dq, time, line_params=LINE_PARAM_IMAGING_LONG, subtract
     #diff = arr.max(axis=0) - np.median(arr, axis=0)
     
     arr_so = np.sort(arr, axis=0)
-    diff = arr_so[-1,:,:] - arr_so[-3,:,:]
     
+    # This will except out if too few reads
+    diff = arr_so[-1,:,:] - arr_so[-3,:,:]
+
     # Global median
     med = np.median(diff[5:-5,5:-5])
     

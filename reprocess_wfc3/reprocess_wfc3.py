@@ -222,8 +222,12 @@ polygon(-46.89536,1045.4771,391.04896,1040.5005,580.16128,-12.05888,-51.692518,-
             
         is_grism = ima[0].header['FILTER'] in ['G102','G141']
         root = os.path.basename(ima.filename()).split('_')[0]        
-        anomalies.auto_flag_trails(cube, dq, time, is_grism=is_grism,
+        try:
+            anomalies.auto_flag_trails(cube, dq, time, is_grism=is_grism,
                                    root=root, earthshine_mask=earthshine_mask)
+        except:
+            # Probably too few reads
+            pass
                     
     #### Readnoise in 4 amps
     readnoise_2D = np.zeros((1024,1024))
