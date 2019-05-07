@@ -1,11 +1,18 @@
-from distutils.core import setup
-#from setuptools import setup
+#from distutils.core import setup
+from setuptools import setup
 
-# v0.1
-# v0.2 - change trail detection thresholds
+#version = '0.1' # 
+version = '0.2' # - change trail detection thresholds
+
+version_str = """# 
+__version__ = "{0}"\n""".format(version)
+
+fp = open('reprocess_wfc3/version.py','w')
+fp.write(version_str)
+fp.close()
 
 setup(name='reprocess_wfc3',
-      version='0.2',
+      version=version,
       description='Reprocessing scripts for WFC3/IR',
       author='Gabriel Brammer',
       author_email='gabriel.brammer@nbi.ku.edu',

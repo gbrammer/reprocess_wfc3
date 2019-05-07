@@ -2,6 +2,6 @@
 import matplotlib
 matplotlib.use('Agg')
 
-from . import reprocess_wfc3
+from .version import __version__
 
-__version__ = "0.2"
+from . import reprocess_wfc3
