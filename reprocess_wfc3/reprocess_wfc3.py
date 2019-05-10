@@ -223,12 +223,19 @@ polygon(-46.89536,1045.4771,391.04896,1040.5005,580.16128,-12.05888,-51.692518,-
         is_grism = ima[0].header['FILTER'] in ['G102','G141']
         root = os.path.basename(ima.filename()).split('_')[0]        
         try:
-            anomalies.auto_flag_trails(cube, dq, time, is_grism=is_grism,
+            anomalies.auto_flag_trails(cube*1, dq*1, time*1,
+                                   is_grism=is_grism,
                                    root=root, earthshine_mask=earthshine_mask)
         except:
             # Probably too few reads
             pass
-                    
+        
+        # if earthshine_mask:
+        #     # Revert cube
+        #     ima = pyfits.open(raw.replace('raw', 'ima'))
+        #     cube, dq, time, NSAMP = split_multiaccum(ima, scale_flat=False)
+            
+        
     #### Readnoise in 4 amps
     readnoise_2D = np.zeros((1024,1024))
     readnoise_2D[512: ,0:512] += ima[0].header['READNSEA']
@@ -269,7 +276,9 @@ polygon(-46.89536,1045.4771,391.04896,1040.5005,580.16128,-12.05888,-51.692518,-
             final_sci -= diff[read,:,:]
             final_dark -= dark_diff[read,:,:]
             final_exptime -= dt[read]
-        
+            if False:
+                ds9.view(final_sci/final_exptime)
+                
         if False:
             ### Experimenting with automated flagging
             sh = (1024,1024)
