@@ -174,7 +174,9 @@ def make_IMA_FLT(raw='ibhj31grq_raw.fits', pop_reads=[], remove_ima=True, fix_sa
     
     earthshine_mask = False
     
-    if earthshine_threshold > 0:
+    samp_seq = raw_im[0].header['SAMP_SEQ']
+    
+    if (earthshine_threshold > 0) & (not samp_seq.startswith('STEP')):
         earth_diff = anomalies.compute_earthshine(cube, dq, time)
         flag_earth = earth_diff > earthshine_threshold
 
