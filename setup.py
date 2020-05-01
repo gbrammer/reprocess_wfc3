@@ -2,7 +2,8 @@
 from setuptools import setup
 
 #version = '0.1' # 
-version = '0.2' # - change trail detection thresholds
+#version = '0.2' # - change trail detection thresholds
+version = '0.2.1' # - error checking on fetch_calibs and calwf3
 
 version_str = """# 
 __version__ = "{0}"\n""".format(version)

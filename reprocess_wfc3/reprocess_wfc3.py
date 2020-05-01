@@ -6,6 +6,7 @@ or satellite trails.
 import os
 import glob
 import shutil
+import traceback
 
 import numpy as np
 import numpy.ma
@@ -48,7 +49,7 @@ def get_flat(hdulist):
     flat = flat_im[1].data
     return flat_im, flat
 
-def fetch_calibs(ima_file, ftpdir='https://hst-crds.stsci.edu/unchecked_get/references/hst/', verbose=True):
+def fetch_calibs(ima_file, ftpdir='https://hst-crds.stsci.edu/unchecked_get/references/hst/', verbose=True, remove_corrupt=True):
     """
     Fetch necessary calibration files needed for running calwf3 from STScI FTP
     
@@ -73,7 +74,21 @@ def fetch_calibs(ima_file, ftpdir='https://hst-crds.stsci.edu/unchecked_get/refe
                 print('Calib: %s=%s' %(ctype, im[0].header[ctype]))
 
             os.system('curl -o %s %s/%s' %(iref_file, ftpdir, cimg))
-    
+            
+            # Check that file is OK, since curl makes a file anyway
+            if 'fits' in iref_file:
+                try:
+                    pyfits.open(iref_file)
+                except:
+                    msg = ('Downloaded file {0} appears to be corrupt.\n'
+                           'Check that {1}/{2} exists and is a valid file')
+
+                    print(msg.format(iref_file, ftpdir, cimg))
+                    if remove_corrupt:
+                        os.remove(iref_file)
+
+                    return False
+                    
     return True
     
 def split_multiaccum(ima, scale_flat=True, get_err=False):
@@ -155,6 +170,8 @@ def make_IMA_FLT(raw='ibhj31grq_raw.fits', pop_reads=[], remove_ima=True, fix_sa
         
     status = fetch_calibs(raw) #, ftpdir='ftp://ftp.stsci.edu/cdbs/iref/')
     if not status:
+        msg = 'Problem with `fetch_calibs(\'{0}\')`, aborting...'
+        print(msg.format(raw))
         return False
         
     if not pop_reads:
@@ -163,8 +180,16 @@ def make_IMA_FLT(raw='ibhj31grq_raw.fits', pop_reads=[], remove_ima=True, fix_sa
     
     #### Run calwf3
     print('reprocess_wfc3: wfc3tools.calwf3(\'{0}\')'.format(raw))
-    wfc3tools.calwf3(raw, log_func=log_func)
-    
+    try:
+        wfc3tools.calwf3(raw, log_func=log_func)
+    except:
+        trace = traceback.format_exc(limit=2)
+        log = '\n########################################## \n'
+        log += '# ! Exception ({0})\n'.format(time.ctime())
+        log += '#\n# !'+'\n# !'.join(trace.split('\n'))
+        log += '\n######################################### \n\n'
+        print(log)
+        
     flt = pyfits.open(raw.replace('raw', 'flt'), mode='update')
     ima = pyfits.open(raw.replace('raw', 'ima'))
     
