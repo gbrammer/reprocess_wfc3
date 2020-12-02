@@ -61,8 +61,11 @@ def fetch_calibs(ima_file, ftpdir='https://hst-crds.stsci.edu/unchecked_get/refe
         return False
         
     im = pyfits.open(ima_file)
-    for ctype in ['BPIXTAB', 'CCDTAB', 'OSCNTAB', 'CRREJTAB', 'DARKFILE', 'NLINFILE', 'PFLTFILE', 'IMPHTTAB', 'IDCTAB']:
-
+    for ctype in ['BPIXTAB', 'CCDTAB', 'OSCNTAB', 'CRREJTAB', 'DARKFILE', 'NLINFILE', 'DFLTFILE', 'PFLTFILE', 'IMPHTTAB', 'IDCTAB']:
+        
+        if ctype not in im[0].header:
+            continue
+            
         if im[0].header[ctype] == 'N/A':
             continue
         
