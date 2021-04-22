@@ -442,8 +442,13 @@ polygon(-46.89536,1045.4771,391.04896,1040.5005,580.16128,-12.05888,-51.692518,-
             wfc3tools.calwf3(raw.replace('raw', 'ima'), log_func=log_func)
             
             #### Put results into an FLT-like file
-            ima = pyfits.open(raw.replace('raw', 'ima_ima'))
-            flt_new = pyfits.open(raw.replace('raw', 'ima_flt'))
+            try:
+                ima = pyfits.open(raw.replace('raw', 'ima_ima'))
+                flt_new = pyfits.open(raw.replace('raw', 'ima_flt'))
+            except:
+                ima = pyfits.open(raw.replace('raw', 'ima'))
+                flt_new = pyfits.open(raw.replace('raw', 'flt'))
+                
             flt['DQ'].data = flt_new['DQ'].data*1
             flt['TIME'] = flt_new['TIME']
             flt['SAMP'] = flt_new['SAMP']
@@ -699,7 +704,7 @@ def show_MultiAccum_reads(raw='ibp329isq_raw.fits', flatten_ramp=False, verbose=
     #plt.savefig(root+'_ramp.png')
     
     canvas = FigureCanvasAgg(fig)
-    canvas.print_figure(root+'_ramp.png', dpi=200, transparent=False)
+    canvas.print_figure(root+'_ramp.png', dpi=200)
     
     #### Same ramp data file    
     np.savetxt('%s_ramp.dat' %(root), np.array([time[1:], avg_ramp/np.diff(time)]).T, fmt='%.3f')

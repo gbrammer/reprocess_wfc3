@@ -19,6 +19,5 @@ setup(name='reprocess_wfc3',
       author_email='gabriel.brammer@nbi.ku.edu',
       url='https://github.com/gbrammer/reprocess_wfc3/',
       packages=['reprocess_wfc3'],
-      install_requires=['numpy', 'matplotlib', 
-                        'astropy', 'scikit-image', 'shapely']
+      install_requires=[]
      )
