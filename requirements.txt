@@ -3,4 +3,5 @@ matplotlib
 astropy
 scikit-image
 shapely
+stsci-tools
 wfc3tools
