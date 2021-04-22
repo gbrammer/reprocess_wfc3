@@ -39,6 +39,8 @@ def test():
     import wfc3tools
     
     from . import utils, reprocess_wfc3
+    from .reprocess_wfc3 import split_multiaccum
+    from . import anomalies
     
     files=glob.glob('*ima.fits'); i=-1
     files.sort()
@@ -55,8 +57,9 @@ def test():
                 pass
 
             ima = pyfits.open(file, mode='update')
-            im[0].header['CRCORR'] = 'PERFORM'
-
+            ima[0].header['CRCORR'] = 'PERFORM'
+            ima.flush()
+            
             wfc3tools.calwf3(file, log_func=reprocess_wfc3.silent_log)
 
         ima = pyfits.open(file.replace('_raw','_ima'))

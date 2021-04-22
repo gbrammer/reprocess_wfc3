@@ -11,6 +11,8 @@ import traceback
 import numpy as np
 import numpy.ma
 
+import time
+
 try:
     import astropy.io.fits as pyfits
 except:
@@ -125,7 +127,7 @@ def split_multiaccum(ima, scale_flat=True, get_err=False):
     if get_err:
         cube_err = cube*0
         
-    time = np.zeros(NSAMP)
+    times = np.zeros(NSAMP)
     for i in range(NSAMP):
         if (ima[0].header['UNITCORR'] == 'COMPLETE') & (~is_dark):
             cube[NSAMP-1-i, :, :] = ima['SCI',i+1].data*ima['TIME',i+1].header['PIXVALUE']/flat
@@ -142,12 +144,12 @@ def split_multiaccum(ima, scale_flat=True, get_err=False):
         if 'ima' in ima.filename():
             dq[NSAMP-1-i, :, :] = ima['DQ',i+1].data
         
-        time[NSAMP-1-i] = ima['TIME',i+1].header['PIXVALUE']
+        times[NSAMP-1-i] = ima['TIME',i+1].header['PIXVALUE']
     
     if get_err:
-        return cube, cube_err, dq, time, NSAMP
+        return cube, cube_err, dq, times, NSAMP
     else:
-        return cube, dq, time, NSAMP
+        return cube, dq, times, NSAMP
              
 def make_IMA_FLT(raw='ibhj31grq_raw.fits', pop_reads=[], remove_ima=True, fix_saturated=True, flatten_ramp=True, stats_region=[[300,714], [300,714]], earthshine_threshold=0.1, log_func=silent_log, auto_trails=True):
     """
@@ -198,14 +200,14 @@ def make_IMA_FLT(raw='ibhj31grq_raw.fits', pop_reads=[], remove_ima=True, fix_sa
     
     #### Pull out the data cube, order in the more natural sense
     #### of first reads first
-    cube, dq, time, NSAMP = split_multiaccum(ima, scale_flat=False)
+    cube, dq, times, NSAMP = split_multiaccum(ima, scale_flat=False)
     
     earthshine_mask = False
     
     samp_seq = raw_im[0].header['SAMP_SEQ']
     
     if (earthshine_threshold > 0) & (not samp_seq.startswith('STEP')):
-        earth_diff = anomalies.compute_earthshine(cube, dq, time)
+        earth_diff = anomalies.compute_earthshine(cube, dq, times)
         flag_earth = earth_diff > earthshine_threshold
 
         flagged_reads = list(np.where(flag_earth)[0])
@@ -248,12 +250,12 @@ polygon(-46.89536,1045.4771,391.04896,1040.5005,580.16128,-12.05888,-51.692518,-
         if earthshine_mask:
             # Recompute cube
             print('reprocess_wfc3: {0} Recompute cube'.format(raw))
-            cube, dq, time, NSAMP = split_multiaccum(ima, scale_flat=False)
+            cube, dq, times, NSAMP = split_multiaccum(ima, scale_flat=False)
             
         is_grism = ima[0].header['FILTER'] in ['G102','G141']
         root = os.path.basename(ima.filename()).split('_')[0]        
         try:
-            anomalies.auto_flag_trails(cube*1, dq*1, time*1,
+            anomalies.auto_flag_trails(cube*1, dq*1, times*1,
                                    is_grism=is_grism,
                                    root=root, earthshine_mask=earthshine_mask)
         except:
@@ -263,7 +265,7 @@ polygon(-46.89536,1045.4771,391.04896,1040.5005,580.16128,-12.05888,-51.692518,-
         # if earthshine_mask:
         #     # Revert cube
         #     ima = pyfits.open(raw.replace('raw', 'ima'))
-        #     cube, dq, time, NSAMP = split_multiaccum(ima, scale_flat=False)
+        #     cube, dq, times, NSAMP = split_multiaccum(ima, scale_flat=False)
             
         
     #### Readnoise in 4 amps
@@ -298,16 +300,16 @@ polygon(-46.89536,1045.4771,391.04896,1040.5005,580.16128,-12.05888,-51.692518,-
         diff = np.diff(cube, axis=0)
         dark_diff = np.diff(dark_cube, axis=0)
 
-        dt = np.diff(time)
-        final_exptime = np.ones((1024, 1024))*time[-1]
+        dt = np.diff(times)
+        final_exptime = np.ones((1024, 1024))*times[-1]
         final_sci = cube[-1,:,:]*1
         final_dark = dark_cube[NSAMP-1,:,:]*1        
         for read in pop_reads:
             final_sci -= diff[read,:,:]
             final_dark -= dark_diff[read,:,:]
             final_exptime -= dt[read]
-            if False:
-                ds9.view(final_sci/final_exptime)
+
+            # ds9.view(final_sci/final_exptime)
                 
         if False:
             ### Experimenting with automated flagging
@@ -494,7 +496,7 @@ polygon(-46.89536,1045.4771,391.04896,1040.5005,580.16128,-12.05888,-51.692518,-
         for i in range(1, NSAMP-1):
             zi_idx[i,:,:] = zi[i,:,:] == last_ok_read
 
-        time_array = time[zi]
+        time_array = times[zi]
         time_array[0,:,:] = 1.e-3 # avoid divide-by-zero
         # pixels that saturated before the last read
         fix = (last_ok_read < (ima[0].header['NSAMP'] - 1)) & (last_ok_read > 0)
@@ -646,7 +648,7 @@ def show_MultiAccum_reads(raw='ibp329isq_raw.fits', flatten_ramp=False, verbose=
     logger.info('Make MULTIACCUM cube')
         
     #### Split the multiaccum file into individual reads    
-    cube, dq, time, NSAMP = split_multiaccum(img, scale_flat=False)
+    cube, dq, times, NSAMP = split_multiaccum(img, scale_flat=False)
     
     if 'raw' in raw:
         dark_file = img[0].header['DARKFILE'].replace('iref$', os.getenv('iref')+'/')
@@ -654,14 +656,14 @@ def show_MultiAccum_reads(raw='ibp329isq_raw.fits', flatten_ramp=False, verbose=
         dark_cube, dark_dq, dark_time, dark_NSAMP = split_multiaccum(dark, scale_flat=False)
 
         diff = np.diff(cube-dark_cube[:NSAMP,:,:], axis=0)*gain
-        dt = np.diff(time)
+        dt = np.diff(times)
     
         #### Need flat for Poisson
         flat_im, flat = get_flat(img)
         diff /= flat
     else:
         diff = np.diff(cube, axis=0)
-        dt = np.diff(time)
+        dt = np.diff(times)
     
     ####  Average ramp
     slx = slice(stats_region[0][0], stats_region[0][1])
@@ -695,8 +697,10 @@ def show_MultiAccum_reads(raw='ibp329isq_raw.fits', flatten_ramp=False, verbose=
     
     ax = fig.add_axes((0.6, 0.05, 0.37, 0.18))
     #ax = fig.add_subplot(428)
-    ax.plot(time[2:], (ramp_cps[1:,16:-16:4].T/np.diff(time)[1:]).T, alpha=0.1, color='black')
-    ax.plot(time[2:], avg_ramp[1:]/np.diff(time)[1:], alpha=0.8, color='red', linewidth=2)
+    ax.plot(times[2:], (ramp_cps[1:,16:-16:4].T/np.diff(times)[1:]).T, 
+            alpha=0.1, color='black')
+    ax.plot(times[2:], avg_ramp[1:]/np.diff(times)[1:], alpha=0.8, 
+            color='red', linewidth=2)
     ax.set_xlabel('time'); ax.set_ylabel('background [e/s]')
 
     #fig.tight_layout(h_pad=0.3, w_pad=0.3, pad=0.5)
@@ -707,20 +711,20 @@ def show_MultiAccum_reads(raw='ibp329isq_raw.fits', flatten_ramp=False, verbose=
     canvas.print_figure(root+'_ramp.png', dpi=200)
     
     #### Same ramp data file    
-    np.savetxt('%s_ramp.dat' %(root), np.array([time[1:], avg_ramp/np.diff(time)]).T, fmt='%.3f')
+    np.savetxt('%s_ramp.dat' %(root), np.array([times[1:], avg_ramp/np.diff(times)]).T, fmt='%.3f')
     
     if flatten_ramp:
         #### Flatten the ramp by setting background countrate to the average.  
         #### Output saved to "*x_flt.fits" rather than the usual *q_flt.fits.
         
-        flux = avg_ramp/np.diff(time)
-        avg = avg_ramp.sum()/time[-1]
+        flux = avg_ramp/np.diff(times)
+        avg = avg_ramp.sum()/times[-1]
         min = flux[1:].min()
-        subval = np.cumsum((flux-avg)*np.diff(time))
+        subval = np.cumsum((flux-avg)*np.diff(times))
         
         imraw = pyfits.open(raw.replace('ima','raw'))
         for i in range(1, NSAMP):
-            logger.info('Remove excess %.2f e/s from read #%d (t=%.1f)' %(flux[-i]-min, NSAMP-i+1, time[-i]))
+            logger.info('Remove excess %.2f e/s from read #%d (t=%.1f)' %(flux[-i]-min, NSAMP-i+1, times[-i]))
             
             imraw['SCI',i].data = imraw['SCI',i].data - np.cast[int](subval[-i]/2.36*flat)
                 
