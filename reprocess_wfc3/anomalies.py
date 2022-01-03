@@ -91,8 +91,7 @@ def test():
             fig = sat_trail_figure(image, edges, lines, label=root)
             #fig.savefig('{0}_trails.png'.format(root))
             canvas = FigureCanvasAgg(fig)
-            canvas.print_figure(root+'_trails.png', dpi=200,
-                                transparent=False)
+            canvas.print_figure(root+'_trails.png', dpi=200)
             
             reg = anomalies.segments_to_mask(lines, params[0]['NK'],
                                              image.shape[1],
@@ -156,8 +155,7 @@ def auto_flag_trails(cube, dq, time, is_grism=False, root='satellite', earthshin
     
     fig = sat_trail_figure(image, edges, lines, label=root)
     canvas = FigureCanvasAgg(fig)
-    canvas.print_figure(root+'_trails.png', dpi=200,
-                        transparent=False)
+    canvas.print_figure(root+'_trails.png', dpi=200)
 
     # fig.savefig('{0}_trails.png'.format(root))
     # plt.close(fig)
