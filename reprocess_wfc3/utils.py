@@ -1,5 +1,86 @@
+import os
+import sys
 import numpy as np
 import warnings
+
+
+def which_calwf3(executable='calwf3.e'):
+    """
+    Return result of `which calwf3.e`
+    """
+    import subprocess
+    
+    env_bin = os.path.join(sys.exec_prefix, 'bin')
+    if (env_bin not in os.getenv('PATH')) & os.path.exists(env_bin):
+        _path = ':'.join([env_bin, os.getenv('PATH')])
+    else:
+        _path = os.getenv('PATH')
+
+    proc = subprocess.Popen(
+        ['which', executable],
+        stderr=subprocess.STDOUT,
+        stdout=subprocess.PIPE,
+        env={'PATH':_path}
+    )
+    
+    result = ''.join([line.decode('utf8').strip() 
+                      for line in proc.stdout])
+    
+    return result
+
+
+def run_calwf3(file, clean=True, log_func=None):
+    """
+    Call calwf3.e executable with PATH fixes
+    
+    Parameters
+    ----------
+    file : str
+        Filename, e.g., `ixxxxxxq_raw.fits`
+
+    clean : bool
+        Clean existing `ima` and `flt` files if `file` is has 'raw' extension
+        
+    log_func : func
+        Function to handle `stdout` from the `calwf3.e` executable
+    
+    Returns
+    -------
+    return_code : int
+        Value returned by the `calwf3.e` process
+        
+    """
+    import subprocess
+    
+    env_bin = os.path.join(sys.exec_prefix, 'bin')
+    if (env_bin not in os.getenv('PATH')) & os.path.exists(env_bin):
+        _path = ':'.join([env_bin, os.getenv('PATH')])
+    else:
+        _path = os.getenv('PATH')
+    
+    if clean & ('_raw.fits' in file):
+        for ext in ['_ima.fits','_flt.fits']:
+            _file = file.replace('_raw.fits',ext)
+            print(f'$ rm {_file}')  
+            os.remove(_file)
+    
+    exec_file = which_calwf3()
+    print(f'$ {exec_file} {file}')  
+    
+    proc = subprocess.Popen(
+        ['calwf3.e', file],
+        stderr=subprocess.STDOUT,
+        stdout=subprocess.PIPE,
+        env={'PATH':_path, 'iref':os.getenv('iref')}
+    )
+    
+    if log_func is not None:
+        for line in proc.stdout:
+            log_func(line.decode('utf8'))
+
+    return_code = proc.wait()
+    return return_code
+
 
 def set_warnings(numpy_level='ignore', astropy_level='ignore'):
     """
@@ -19,12 +100,14 @@ def set_warnings(numpy_level='ignore', astropy_level='ignore'):
     np.seterr(all=numpy_level)
     warnings.simplefilter(astropy_level, category=AstropyWarning)
 
+
 def nmad(data):
     """Normalized NMAD=1.48 * `~.astropy.stats.median_absolute_deviation`
     
     """
     import astropy.stats
     return 1.48*astropy.stats.median_absolute_deviation(data)
+
 
 def shapely_polygon_to_region(shape, prefix=['image\n']):
     """

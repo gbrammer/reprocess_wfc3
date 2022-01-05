@@ -41,7 +41,8 @@ def silent_log(input_string):
     Quiet calwf3 logs
     """
     pass
-    
+
+
 def get_flat(hdulist):
     """
     Get the flat-field file specified in the header
@@ -50,6 +51,7 @@ def get_flat(hdulist):
     flat_im = pyfits.open(flat_file)
     flat = flat_im[1].data
     return flat_im, flat
+
 
 def fetch_calibs(ima_file, ftpdir='https://hst-crds.stsci.edu/unchecked_get/references/hst/', verbose=True, remove_corrupt=True):
     """
@@ -186,7 +188,8 @@ def make_IMA_FLT(raw='ibhj31grq_raw.fits', pop_reads=[], remove_ima=True, fix_sa
     #### Run calwf3
     print('reprocess_wfc3: wfc3tools.calwf3(\'{0}\')'.format(raw))
     try:
-        wfc3tools.calwf3(raw, log_func=log_func)
+        #wfc3tools.calwf3(raw, log_func=log_func)
+        utils.run_calwf3(raw, log_func=log_func)
     except:
         trace = traceback.format_exc(limit=2)
         log = '\n########################################## \n'
@@ -441,7 +444,8 @@ polygon(-46.89536,1045.4771,391.04896,1040.5005,580.16128,-12.05888,-51.692518,-
                 os.remove(file)
         
             #### Run calwf3 on cleaned IMA
-            wfc3tools.calwf3(raw.replace('raw', 'ima'), log_func=log_func)
+            #wfc3tools.calwf3(raw.replace('raw', 'ima'), log_func=log_func)
+            utils.run_calwf3(raw.replace('raw', 'ima'), log_func=log_func)
             
             #### Put results into an FLT-like file
             try:
@@ -736,8 +740,9 @@ def show_MultiAccum_reads(raw='ibp329isq_raw.fits', flatten_ramp=False, verbose=
         imraw.writeto(raw.replace('q_raw', 'x_raw'), overwrite=True)
         
         ## Run calwf3
-        wfc3tools.calwf3(raw.replace('q_raw', 'x_raw'))
-                
+        #wfc3tools.calwf3(raw.replace('q_raw', 'x_raw'))
+        utils.run_calwf3(raw.replace('q_raw', 'x_raw'), clean=True)
+        
     return fig
     
 def in_shadow(file='ibhj07ynq_raw.fits'):
