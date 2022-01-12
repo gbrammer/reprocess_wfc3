@@ -61,8 +61,9 @@ def run_calwf3(file, clean=True, log_func=None):
     if clean & ('_raw.fits' in file):
         for ext in ['_ima.fits','_flt.fits']:
             _file = file.replace('_raw.fits',ext)
-            print(f'$ rm {_file}')  
-            os.remove(_file)
+            if os.path.exists(_file):
+                print(f'$ rm {_file}')  
+                os.remove(_file)
     
     exec_file = which_calwf3()
     print(f'$ {exec_file} {file}')  
