@@ -122,7 +122,7 @@ def split_multiaccum(ima, scale_flat=True, get_err=False):
     
     cube = np.zeros((NSAMP, sh[0], sh[1]))
     if 'ima' in ima.filename():
-        dq = np.zeros((NSAMP, sh[0], sh[1]), dtype=np.int)
+        dq = np.zeros((NSAMP, sh[0], sh[1]), dtype=np.int32)
     else:
         dq = 0
     
